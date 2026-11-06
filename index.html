@@ -12,7 +12,31 @@
     h2 { margin-top: 0; font-size: 22px; color: #222; }
     #userName { font-size: 15px; color: #666; margin-bottom: 20px; }
     
-    .file-dropzone { border: 2px dashed #d1d5db; border-radius: 12px; padding: 20px 10px; background: #fafafa; cursor: pointer; margin-bottom: 16px; transition: 0.2s; }
+    .file-dropzone {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      width: 100%;
+      min-height: 120px;
+      border: 2px dashed #d1d5db;
+      border-radius: 12px;
+      padding: 20px 16px;
+      background: #fafafa;
+      cursor: pointer;
+      margin-bottom: 16px;
+      transition: 0.2s;
+    }
+    .file-dropzone svg {
+      display: block;
+      margin-bottom: 8px;
+    }
+    .file-dropzone p {
+      margin: 0;
+      font-size: 14px;
+      color: #6b7280;
+      white-space: nowrap;
+    }
     .file-dropzone:active { background: #f0f0f0; }
     .file-dropzone p { margin: 6px 0 0 0; font-size: 14px; color: #6b7280; }
     input[type="file"] { display: none; }
