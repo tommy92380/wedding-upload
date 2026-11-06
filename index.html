@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>婚禮相片與影片分享</title>
+  <title>婚禮相片與短影片分享</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -32,8 +32,10 @@
     .file-dropzone p { margin: 0; font-size: 14px; color: #6b7280; white-space: nowrap; }
     input[type="file"] { display: none; }
     
-    .preview-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; max-height: 180px; overflow-y: auto; }
-    .preview-container img, .preview-container video { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
+    .preview-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
+    .preview-item { position: relative; width: 68px; height: 68px; }
+    .preview-item img, .preview-item video { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; }
+    .video-tag { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 1px 4px; border-radius: 4px; }
     
     .btn { display: block; width: 100%; padding: 14px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
@@ -43,6 +45,7 @@
     .progress-bar-bg { background: #e5e7eb; border-radius: 8px; height: 10px; overflow: hidden; margin-bottom: 8px; }
     .progress-bar-fill { background: #06C755; height: 100%; width: 0%; transition: width 0.2s ease; }
     .status-text { font-size: 14px; color: #4b5563; margin-top: 6px; }
+    .skip-alert { margin-top: 12px; padding: 10px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; font-size: 13px; color: #be123c; text-align: left; display: none; }
   </style>
 </head>
 <body>
@@ -55,27 +58,27 @@
     <svg width="32" height="32" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
     <p id="dropzoneText">點擊挑選照片或短影片 (可多選)</p>
   </label>
-  <!-- 支援圖片與影片選取 -->
   <input type="file" id="filePicker" multiple accept="image/*,video/*">
 
   <div class="preview-container" id="previewContainer"></div>
 
-  <button id="uploadBtn" class="btn" disabled>開始上傳</button>
+  <button id="uploadBtn" class="btn" disabled>開始上傳 (原圖無損)</button>
 
   <div class="progress-box" id="progressBox">
     <div class="progress-bar-bg">
       <div class="progress-bar-fill" id="progressBar"></div>
     </div>
     <div class="status-text" id="statusText">準備中...</div>
+    <div class="skip-alert" id="skipAlert"></div>
   </div>
 
   <button id="closeBtn" class="btn btn-close">關閉並回到聊天室</button>
 </div>
 
 <script>
-  const LIFF_ID = "2012423151-rJrXnLMN"; // 請填入你的真實 LIFF ID
-  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzSUQ9MES6XQ-rrEKGd7NwE_F_svuSZcPBbhtQmWHGtIH_z8embQqKq81Azbo5kpI7f7w/exec"; // 請填入你的 GAS Web App URL
-  const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 影片上限 30MB
+  const LIFF_ID = "2012423151-rJrXnLMN";
+  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzSUQ9MES6XQ-rrEKGd7NwE_F_svuSZcPBbhtQmWHGtIH_z8embQqKq81Azbo5kpI7f7w/exec";
+  const MAX_FILE_SIZE = 36 * 1024 * 1024; // 36MB (GAS 物理上限)
   let lineProfile = null;
   let selectedFiles = [];
 
@@ -93,7 +96,7 @@
     }
   }
 
-  // 監聽選檔並生成預覽
+  // 選取檔案並生成預覽 (含 iOS 影片首幀修復)
   document.getElementById('filePicker').addEventListener('change', function(e) {
     selectedFiles = Array.from(e.target.files);
     const previewContainer = document.getElementById('previewContainer');
@@ -107,15 +110,27 @@
       uploadBtn.disabled = false;
 
       selectedFiles.forEach(file => {
+        const itemBox = document.createElement('div');
+        itemBox.className = 'preview-item';
+
         if (file.type.startsWith('video/')) {
           const vid = document.createElement('video');
-          vid.src = URL.createObjectURL(file);
-          previewContainer.appendChild(vid);
+          vid.src = URL.createObjectURL(file) + '#t=0.1';
+          vid.muted = true;
+          vid.playsInline = true;
+          vid.preload = 'metadata';
+          itemBox.appendChild(vid);
+
+          const tag = document.createElement('span');
+          tag.className = 'video-tag';
+          tag.innerText = '影片';
+          itemBox.appendChild(tag);
         } else {
           const img = document.createElement('img');
           img.src = URL.createObjectURL(file);
-          previewContainer.appendChild(img);
+          itemBox.appendChild(img);
         }
+        previewContainer.appendChild(itemBox);
       });
     } else {
       dropzoneText.innerText = '點擊挑選照片或短影片 (可多選)';
@@ -123,7 +138,7 @@
     }
   });
 
-  // 上傳核心
+  // 上傳流程 (原圖無損讀取)
   document.getElementById('uploadBtn').addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
 
@@ -133,6 +148,7 @@
     const progressBox = document.getElementById('progressBox');
     const progressBar = document.getElementById('progressBar');
     const statusText = document.getElementById('statusText');
+    const skipAlert = document.getElementById('skipAlert');
     const closeBtn = document.getElementById('closeBtn');
 
     uploadBtn.disabled = true;
@@ -142,38 +158,26 @@
 
     const total = selectedFiles.length;
     let completed = 0;
+    let skippedFiles = [];
 
-    // 單檔處理與上傳函式
     async function processAndUpload(file, index) {
-      // 影片大小檢查
-      if (file.type.startsWith('video/') && file.size > MAX_VIDEO_SIZE) {
-        statusText.innerText = `檔案「${file.name}」超過 30MB 已略過`;
+      // 超過 GAS 限制檢查
+      if (file.size > MAX_FILE_SIZE) {
+        skippedFiles.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
         completed++;
         return;
       }
 
-      statusText.innerText = `正在處理第 ${index + 1} / ${total} 個檔案...`;
+      statusText.innerText = `正在上傳第 ${index + 1} / ${total} 個檔案...`;
 
-      let base64Data = '';
-      let mimeType = file.type;
-      let finalName = file.name;
-
-      // 圖片走輕量化壓縮加速，影片直接讀取
-      if (file.type.startsWith('image/')) {
-        base64Data = await compressImageToBase64(file);
-        mimeType = 'image/jpeg';
-        if (!finalName.toLowerCase().endsWith('.jpg') && !finalName.toLowerCase().endsWith('.jpeg')) {
-          finalName += '.jpg';
-        }
-      } else {
-        base64Data = await fileToBase64(file);
-      }
+      // 100% 原始檔案讀取，不破壞畫質
+      const base64Data = await fileToBase64(file);
 
       const payload = {
         action: 'upload_file',
         base64: base64Data.split(',')[1],
-        mimeType: mimeType,
-        fileName: `${lineProfile ? lineProfile.displayName : 'Guest'}_${Date.now()}_${finalName}`
+        mimeType: file.type || 'application/octet-stream',
+        fileName: `${lineProfile ? lineProfile.displayName : 'Guest'}_${Date.now()}_${file.name}`
       };
 
       try {
@@ -183,7 +187,7 @@
           body: JSON.stringify(payload)
         });
       } catch (err) {
-        console.error('上傳錯誤', err);
+        console.error('上傳失敗', err);
       }
 
       completed++;
@@ -192,7 +196,7 @@
       statusText.innerText = `已完成 ${completed} / ${total} (${percent}%)`;
     }
 
-    // 併發控制器（每次同時跑 2 個請求，兼顧速度與手機穩定度）
+    // 併發 2 個通道保持順暢
     const concurrency = 2;
     for (let i = 0; i < selectedFiles.length; i += concurrency) {
       const chunk = selectedFiles.slice(i, i + concurrency);
@@ -200,49 +204,18 @@
     }
 
     progressBar.style.width = '100%';
-    statusText.innerText = '所有相片/影片已成功上傳！感謝你的分享 ❤️';
     uploadBtn.style.display = 'none';
     closeBtn.style.display = 'block';
+
+    if (skippedFiles.length > 0) {
+      statusText.innerText = '部分檔案已完成上傳！';
+      skipAlert.style.display = 'block';
+      skipAlert.innerHTML = `⚠️ <b>以下檔案超過 36MB 限制未上傳：</b><br>${skippedFiles.join('<br>')}<br><span style="color:#666;font-size:12px;">建議將長影片剪輯成 20 秒短片再分享喔！</span>`;
+    } else {
+      statusText.innerText = '所有相片與影片已成功以原檔畫質上傳！感謝你的分享 ❤️';
+    }
   });
 
-  // 前端圖片無損等比縮放壓縮 (長邊 2560px, JPEG 85% 品質)
-  function compressImageToBase64(file) {
-    return new Promise((resolve) => {
-      const img = new Image();
-      img.src = URL.createObjectURL(file);
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxSide = 2560; // 2.5K 超清解析度
-
-        if (width > maxSide || height > maxSide) {
-          if (width > height) {
-            height = Math.round((height * maxSide) / width);
-            width = maxSide;
-          } else {
-            width = Math.round((width * maxSide) / height);
-            height = maxSide;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-        URL.revokeObjectURL(img.src);
-        resolve(dataUrl);
-      };
-      img.onerror = () => {
-        // 若壓縮失敗則退回原檔讀取
-        fileToBase64(file).then(resolve);
-      };
-    });
-  }
-
-  // 影片原生讀取
   function fileToBase64(file) {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
