@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>婚禮相片原圖上傳</title>
+  <title>婚禮相片與影片分享</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -27,22 +27,13 @@
       margin-bottom: 16px;
       transition: 0.2s;
     }
-    .file-dropzone svg {
-      display: block;
-      margin-bottom: 8px;
-    }
-    .file-dropzone p {
-      margin: 0;
-      font-size: 14px;
-      color: #6b7280;
-      white-space: nowrap;
-    }
     .file-dropzone:active { background: #f0f0f0; }
-    .file-dropzone p { margin: 6px 0 0 0; font-size: 14px; color: #6b7280; }
+    .file-dropzone svg { display: block; margin-bottom: 8px; }
+    .file-dropzone p { margin: 0; font-size: 14px; color: #6b7280; white-space: nowrap; }
     input[type="file"] { display: none; }
     
-    .preview-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; max-height: 160px; overflow-y: auto; }
-    .preview-container img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
+    .preview-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; max-height: 180px; overflow-y: auto; }
+    .preview-container img, .preview-container video { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; border: 1px solid #eee; }
     
     .btn { display: block; width: 100%; padding: 14px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
@@ -50,25 +41,26 @@
     
     .progress-box { margin-top: 20px; display: none; }
     .progress-bar-bg { background: #e5e7eb; border-radius: 8px; height: 10px; overflow: hidden; margin-bottom: 8px; }
-    .progress-bar-fill { background: #06C755; height: 100%; width: 0%; transition: width 0.3s ease; }
-    .status-text { font-size: 14px; color: #4b5563; }
+    .progress-bar-fill { background: #06C755; height: 100%; width: 0%; transition: width 0.2s ease; }
+    .status-text { font-size: 14px; color: #4b5563; margin-top: 6px; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>分享婚禮原圖照片 ❤️</h2>
+  <h2>分享婚禮相片與短影片 ❤️</h2>
   <p id="userName">載入使用者資訊中...</p>
   
   <label class="file-dropzone" for="filePicker" id="dropzone">
     <svg width="32" height="32" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-    <p id="dropzoneText">點擊此處挑選照片 (可多選)</p>
+    <p id="dropzoneText">點擊挑選照片或短影片 (可多選)</p>
   </label>
-  <input type="file" id="filePicker" multiple accept="image/*">
+  <!-- 支援圖片與影片選取 -->
+  <input type="file" id="filePicker" multiple accept="image/*,video/*">
 
   <div class="preview-container" id="previewContainer"></div>
 
-  <button id="uploadBtn" class="btn" disabled>開始上傳原圖</button>
+  <button id="uploadBtn" class="btn" disabled>開始上傳</button>
 
   <div class="progress-box" id="progressBox">
     <div class="progress-bar-bg">
@@ -81,8 +73,9 @@
 </div>
 
 <script>
-  const LIFF_ID = "2012423151-rJrXnLMN"; // 請填入真實 LIFF ID
-  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzSUQ9MES6XQ-rrEKGd7NwE_F_svuSZcPBbhtQmWHGtIH_z8embQqKq81Azbo5kpI7f7w/exec"; // 請填入真實 GAS Web App 網址
+  const LIFF_ID = "2012423151-rJrXnLMN"; // 請填入你的真實 LIFF ID
+  const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzSUQ9MES6XQ-rrEKGd7NwE_F_svuSZcPBbhtQmWHGtIH_z8embQqKq81Azbo5kpI7f7w/exec"; // 請填入你的 GAS Web App URL
+  const MAX_VIDEO_SIZE = 30 * 1024 * 1024; // 影片上限 30MB
   let lineProfile = null;
   let selectedFiles = [];
 
@@ -94,13 +87,13 @@
         return;
       }
       lineProfile = await liff.getProfile();
-      document.getElementById('userName').innerText = `哈囉，${lineProfile.displayName}！選好照片即可上傳：`;
+      document.getElementById('userName').innerText = `哈囉，${lineProfile.displayName}！選好即可上傳：`;
     } catch (err) {
       document.getElementById('userName').innerText = '載入失敗：' + err;
     }
   }
 
-  // 選擇檔案監聽與預覽
+  // 監聽選檔並生成預覽
   document.getElementById('filePicker').addEventListener('change', function(e) {
     selectedFiles = Array.from(e.target.files);
     const previewContainer = document.getElementById('previewContainer');
@@ -110,21 +103,27 @@
     previewContainer.innerHTML = '';
 
     if (selectedFiles.length > 0) {
-      dropzoneText.innerText = `已選擇 ${selectedFiles.length} 張照片 (可重新點擊更換)`;
+      dropzoneText.innerText = `已選擇 ${selectedFiles.length} 個檔案 (點此更換)`;
       uploadBtn.disabled = false;
 
       selectedFiles.forEach(file => {
-        const img = document.createElement('img');
-        img.src = URL.createObjectURL(file);
-        previewContainer.appendChild(img);
+        if (file.type.startsWith('video/')) {
+          const vid = document.createElement('video');
+          vid.src = URL.createObjectURL(file);
+          previewContainer.appendChild(vid);
+        } else {
+          const img = document.createElement('img');
+          img.src = URL.createObjectURL(file);
+          previewContainer.appendChild(img);
+        }
       });
     } else {
-      dropzoneText.innerText = '點擊此處挑選照片 (可多選)';
+      dropzoneText.innerText = '點擊挑選照片或短影片 (可多選)';
       uploadBtn.disabled = true;
     }
   });
 
-  // 上傳邏輯
+  // 上傳核心
   document.getElementById('uploadBtn').addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
 
@@ -136,26 +135,45 @@
     const statusText = document.getElementById('statusText');
     const closeBtn = document.getElementById('closeBtn');
 
-    // 鎖定 UI 防手滑
     uploadBtn.disabled = true;
     filePicker.disabled = true;
     dropzone.style.pointerEvents = 'none';
     progressBox.style.display = 'block';
 
     const total = selectedFiles.length;
+    let completed = 0;
 
-    for (let i = 0; i < total; i++) {
-      const file = selectedFiles[i];
-      const percent = Math.round((i / total) * 100);
-      progressBar.style.width = percent + '%';
-      statusText.innerText = `正在上傳第 ${i + 1} / ${total} 張 (${file.name})...`;
+    // 單檔處理與上傳函式
+    async function processAndUpload(file, index) {
+      // 影片大小檢查
+      if (file.type.startsWith('video/') && file.size > MAX_VIDEO_SIZE) {
+        statusText.innerText = `檔案「${file.name}」超過 30MB 已略過`;
+        completed++;
+        return;
+      }
 
-      const base64 = await fileToBase64(file);
+      statusText.innerText = `正在處理第 ${index + 1} / ${total} 個檔案...`;
+
+      let base64Data = '';
+      let mimeType = file.type;
+      let finalName = file.name;
+
+      // 圖片走輕量化壓縮加速，影片直接讀取
+      if (file.type.startsWith('image/')) {
+        base64Data = await compressImageToBase64(file);
+        mimeType = 'image/jpeg';
+        if (!finalName.toLowerCase().endsWith('.jpg') && !finalName.toLowerCase().endsWith('.jpeg')) {
+          finalName += '.jpg';
+        }
+      } else {
+        base64Data = await fileToBase64(file);
+      }
+
       const payload = {
         action: 'upload_file',
-        base64: base64.split(',')[1],
-        mimeType: file.type,
-        fileName: `${lineProfile ? lineProfile.displayName : 'Guest'}_${Date.now()}_${file.name}`
+        base64: base64Data.split(',')[1],
+        mimeType: mimeType,
+        fileName: `${lineProfile ? lineProfile.displayName : 'Guest'}_${Date.now()}_${finalName}`
       };
 
       try {
@@ -165,16 +183,74 @@
           body: JSON.stringify(payload)
         });
       } catch (err) {
-        console.error('上傳失敗', err);
+        console.error('上傳錯誤', err);
       }
+
+      completed++;
+      const percent = Math.round((completed / total) * 100);
+      progressBar.style.width = percent + '%';
+      statusText.innerText = `已完成 ${completed} / ${total} (${percent}%)`;
     }
 
-    // 完成狀態
+    // 併發控制器（每次同時跑 2 個請求，兼顧速度與手機穩定度）
+    const concurrency = 2;
+    for (let i = 0; i < selectedFiles.length; i += concurrency) {
+      const chunk = selectedFiles.slice(i, i + concurrency);
+      await Promise.all(chunk.map((file, idx) => processAndUpload(file, i + idx)));
+    }
+
     progressBar.style.width = '100%';
-    statusText.innerText = '全部照片已成功上傳！感謝你的分享 ❤️';
+    statusText.innerText = '所有相片/影片已成功上傳！感謝你的分享 ❤️';
     uploadBtn.style.display = 'none';
     closeBtn.style.display = 'block';
   });
+
+  // 前端圖片無損等比縮放壓縮 (長邊 2560px, JPEG 85% 品質)
+  function compressImageToBase64(file) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.src = URL.createObjectURL(file);
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxSide = 2560; // 2.5K 超清解析度
+
+        if (width > maxSide || height > maxSide) {
+          if (width > height) {
+            height = Math.round((height * maxSide) / width);
+            width = maxSide;
+          } else {
+            width = Math.round((width * maxSide) / height);
+            height = maxSide;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        URL.revokeObjectURL(img.src);
+        resolve(dataUrl);
+      };
+      img.onerror = () => {
+        // 若壓縮失敗則退回原檔讀取
+        fileToBase64(file).then(resolve);
+      };
+    });
+  }
+
+  // 影片原生讀取
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = (error) => reject(error);
+      reader.readAsDataURL(file);
+    });
+  }
 
   document.getElementById('closeBtn').addEventListener('click', () => {
     if (liff.isInClient()) {
@@ -183,15 +259,6 @@
       window.close();
     }
   });
-
-  function fileToBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(reader.result);
-      reader.onerror = error => reject(error);
-      reader.readAsDataURL(file);
-    });
-  }
 
   initLiff();
 </script>
