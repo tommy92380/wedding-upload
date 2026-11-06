@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>婚禮相片與短影片分享</title>
+  <title>婚禮相片分享</title>
   <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
   <style>
     * { box-sizing: border-box; }
@@ -24,7 +24,7 @@
       padding: 20px 16px;
       background: #fafafa;
       cursor: pointer;
-      margin-bottom: 16px;
+      margin-bottom: 12px;
       transition: 0.2s;
     }
     .file-dropzone:active { background: #f0f0f0; }
@@ -32,10 +32,19 @@
     .file-dropzone p { margin: 0; font-size: 14px; color: #6b7280; white-space: nowrap; }
     input[type="file"] { display: none; }
     
+    .video-note {
+      font-size: 13px;
+      color: #71717a;
+      line-height: 1.5;
+      background: #f4f4f5;
+      padding: 10px 14px;
+      border-radius: 8px;
+      margin-bottom: 16px;
+      text-align: left;
+    }
+    
     .preview-container { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin-bottom: 16px; max-height: 200px; overflow-y: auto; }
-    .preview-item { position: relative; width: 68px; height: 68px; }
-    .preview-item img, .preview-item video { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; }
-    .video-tag { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.6); color: white; font-size: 10px; padding: 1px 4px; border-radius: 4px; }
+    .preview-container img { width: 68px; height: 68px; object-fit: cover; border-radius: 8px; border: 1px solid #e2e8f0; }
     
     .btn { display: block; width: 100%; padding: 14px; background: #06C755; color: white; border: none; border-radius: 10px; font-size: 16px; font-weight: 600; cursor: pointer; transition: 0.2s; }
     .btn:disabled { background: #cbd5e1; cursor: not-allowed; }
@@ -45,20 +54,23 @@
     .progress-bar-bg { background: #e5e7eb; border-radius: 8px; height: 10px; overflow: hidden; margin-bottom: 8px; }
     .progress-bar-fill { background: #06C755; height: 100%; width: 0%; transition: width 0.2s ease; }
     .status-text { font-size: 14px; color: #4b5563; margin-top: 6px; }
-    .skip-alert { margin-top: 12px; padding: 10px; background: #fff1f2; border: 1px solid #fecdd3; border-radius: 8px; font-size: 13px; color: #be123c; text-align: left; display: none; }
   </style>
 </head>
 <body>
 
 <div class="card">
-  <h2>分享婚禮相片與短影片 ❤️</h2>
+  <h2>分享婚禮相片 ❤️</h2>
   <p id="userName">載入使用者資訊中...</p>
   
   <label class="file-dropzone" for="filePicker" id="dropzone">
     <svg width="32" height="32" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-    <p id="dropzoneText">點擊挑選照片或短影片 (可多選)</p>
+    <p id="dropzoneText">點擊挑選婚禮照片 (可多選)</p>
   </label>
-  <input type="file" id="filePicker" multiple accept="image/*,video/*">
+  <input type="file" id="filePicker" multiple accept="image/*">
+
+  <div class="video-note">
+    💡 <b>小提醒：</b>此處為高畫質原圖上傳區。若有錄製現場長錄影或祝福影片，歡迎直接私訊新人的個人 LINE 分享給我們喔！
+  </div>
 
   <div class="preview-container" id="previewContainer"></div>
 
@@ -69,7 +81,6 @@
       <div class="progress-bar-fill" id="progressBar"></div>
     </div>
     <div class="status-text" id="statusText">準備中...</div>
-    <div class="skip-alert" id="skipAlert"></div>
   </div>
 
   <button id="closeBtn" class="btn btn-close">關閉並回到聊天室</button>
@@ -78,7 +89,6 @@
 <script>
   const LIFF_ID = "2012423151-rJrXnLMN";
   const GAS_WEBAPP_URL = "https://script.google.com/macros/s/AKfycbzSUQ9MES6XQ-rrEKGd7NwE_F_svuSZcPBbhtQmWHGtIH_z8embQqKq81Azbo5kpI7f7w/exec";
-  const MAX_FILE_SIZE = 36 * 1024 * 1024; // 36MB (GAS 物理上限)
   let lineProfile = null;
   let selectedFiles = [];
 
@@ -90,13 +100,13 @@
         return;
       }
       lineProfile = await liff.getProfile();
-      document.getElementById('userName').innerText = `哈囉，${lineProfile.displayName}！選好即可上傳：`;
+      document.getElementById('userName').innerText = `哈囉，${lineProfile.displayName}！選好照片即可上傳：`;
     } catch (err) {
       document.getElementById('userName').innerText = '載入失敗：' + err;
     }
   }
 
-  // 選取檔案並生成預覽 (含 iOS 影片首幀修復)
+  // 選取相片並預覽
   document.getElementById('filePicker').addEventListener('change', function(e) {
     selectedFiles = Array.from(e.target.files);
     const previewContainer = document.getElementById('previewContainer');
@@ -106,39 +116,21 @@
     previewContainer.innerHTML = '';
 
     if (selectedFiles.length > 0) {
-      dropzoneText.innerText = `已選擇 ${selectedFiles.length} 個檔案 (點此更換)`;
+      dropzoneText.innerText = `已選擇 ${selectedFiles.length} 張照片 (點此更換)`;
       uploadBtn.disabled = false;
 
       selectedFiles.forEach(file => {
-        const itemBox = document.createElement('div');
-        itemBox.className = 'preview-item';
-
-        if (file.type.startsWith('video/')) {
-          const vid = document.createElement('video');
-          vid.src = URL.createObjectURL(file) + '#t=0.1';
-          vid.muted = true;
-          vid.playsInline = true;
-          vid.preload = 'metadata';
-          itemBox.appendChild(vid);
-
-          const tag = document.createElement('span');
-          tag.className = 'video-tag';
-          tag.innerText = '影片';
-          itemBox.appendChild(tag);
-        } else {
-          const img = document.createElement('img');
-          img.src = URL.createObjectURL(file);
-          itemBox.appendChild(img);
-        }
-        previewContainer.appendChild(itemBox);
+        const img = document.createElement('img');
+        img.src = URL.createObjectURL(file);
+        previewContainer.appendChild(img);
       });
     } else {
-      dropzoneText.innerText = '點擊挑選照片或短影片 (可多選)';
+      dropzoneText.innerText = '點擊挑選婚禮照片 (可多選)';
       uploadBtn.disabled = true;
     }
   });
 
-  // 上傳流程 (原圖無損讀取)
+  // 上傳核心
   document.getElementById('uploadBtn').addEventListener('click', async () => {
     if (selectedFiles.length === 0) return;
 
@@ -148,7 +140,6 @@
     const progressBox = document.getElementById('progressBox');
     const progressBar = document.getElementById('progressBar');
     const statusText = document.getElementById('statusText');
-    const skipAlert = document.getElementById('skipAlert');
     const closeBtn = document.getElementById('closeBtn');
 
     uploadBtn.disabled = true;
@@ -158,25 +149,16 @@
 
     const total = selectedFiles.length;
     let completed = 0;
-    let skippedFiles = [];
 
     async function processAndUpload(file, index) {
-      // 超過 GAS 限制檢查
-      if (file.size > MAX_FILE_SIZE) {
-        skippedFiles.push(`${file.name} (${(file.size / (1024 * 1024)).toFixed(1)}MB)`);
-        completed++;
-        return;
-      }
+      statusText.innerText = `正在上傳第 ${index + 1} / ${total} 張 (${file.name})...`;
 
-      statusText.innerText = `正在上傳第 ${index + 1} / ${total} 個檔案...`;
-
-      // 100% 原始檔案讀取，不破壞畫質
       const base64Data = await fileToBase64(file);
 
       const payload = {
         action: 'upload_file',
         base64: base64Data.split(',')[1],
-        mimeType: file.type || 'application/octet-stream',
+        mimeType: file.type || 'image/jpeg',
         fileName: `${lineProfile ? lineProfile.displayName : 'Guest'}_${Date.now()}_${file.name}`
       };
 
@@ -196,7 +178,7 @@
       statusText.innerText = `已完成 ${completed} / ${total} (${percent}%)`;
     }
 
-    // 併發 2 個通道保持順暢
+    // 每次同時上傳 2 張照片
     const concurrency = 2;
     for (let i = 0; i < selectedFiles.length; i += concurrency) {
       const chunk = selectedFiles.slice(i, i + concurrency);
@@ -204,16 +186,9 @@
     }
 
     progressBar.style.width = '100%';
+    statusText.innerText = '所有相片已成功以原圖畫質上傳！感謝你的分享 ❤️';
     uploadBtn.style.display = 'none';
     closeBtn.style.display = 'block';
-
-    if (skippedFiles.length > 0) {
-      statusText.innerText = '部分檔案已完成上傳！';
-      skipAlert.style.display = 'block';
-      skipAlert.innerHTML = `⚠️ <b>以下檔案超過 36MB 限制未上傳：</b><br>${skippedFiles.join('<br>')}<br><span style="color:#666;font-size:12px;">建議將長影片剪輯成 20 秒短片再分享喔！</span>`;
-    } else {
-      statusText.innerText = '所有相片與影片已成功以原檔畫質上傳！感謝你的分享 ❤️';
-    }
   });
 
   function fileToBase64(file) {
